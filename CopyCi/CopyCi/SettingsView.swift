@@ -14,54 +14,41 @@ struct SettingsView: View {
 
         var icon: String {
             switch self {
-            case .general:    return "gearshape"
-            case .appearance: return "paintbrush"
-            case .snippets:   return "doc.text"
+            case .general:    return "gearshape.fill"
+            case .appearance: return "paintbrush.fill"
+            case .snippets:   return "doc.text.fill"
             }
         }
     }
 
     var body: some View {
-        ZStack {
-            // Full-window vibrancy — blends with desktop like Finder/System Settings
-            SettingsVibrancy(material: .sidebar)
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Toolbar area (sits under real titlebar)
-                tabBar
-                    .padding(.top, 44) // leave room for native titlebar
-
-                Divider().opacity(0.3)
-
-                // Content
-                contentArea
+        VStack(spacing: 0) {
+            // Native-style toolbar tab bar
+            HStack(spacing: 0) {
+                ForEach(Tab.allCases, id: \.self) { t in
+                    TabItem(tab: t, isSelected: tab == t) { withAnimation(.easeInOut(duration: 0.15)) { tab = t } }
+                }
             }
-        }
-        .frame(width: 580, height: 500)
-    }
+            .frame(height: 56)
+            .background(Color(NSColor.windowBackgroundColor))
 
-    private var tabBar: some View {
-        HStack(spacing: 2) {
-            ForEach(Tab.allCases, id: \.self) { t in
-                TabBarItem(tab: t, isSelected: tab == t) { tab = t }
+            Divider()
+
+            // Content
+            Group {
+                switch tab {
+                case .general:    GeneralTab()
+                case .appearance: AppearanceTab()
+                case .snippets:   SnippetsTab()
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
-    }
-
-    @ViewBuilder
-    private var contentArea: some View {
-        switch tab {
-        case .general:    GeneralTab()
-        case .appearance: AppearanceTab()
-        case .snippets:   SnippetsTab()
-        }
+        .frame(width: 640, height: 480)
     }
 }
 
-struct TabBarItem: View {
+struct TabItem: View {
     let tab: SettingsView.Tab
     let isSelected: Bool
     let action: () -> Void
@@ -70,23 +57,20 @@ struct TabBarItem: View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 Text(tab.rawValue)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.system(size: 11, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             }
-            .frame(width: 100, height: 50)
+            .frame(width: 100, height: 48)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected
-                          ? Color.accentColor.opacity(0.12)
-                          : Color.clear)
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+                    .padding(.horizontal, 4)
             )
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
@@ -99,44 +83,43 @@ struct GeneralTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                SettingsGroup(title: "Запуск") {
-                    SettingsRow {
-                        Toggle("Запускать при входе в систему", isOn: $autoLaunch)
+            VStack(alignment: .leading, spacing: 24) {
+                PrefSection(title: "Запуск") {
+                    PrefRow("Автозапуск при входе в систему") {
+                        Toggle("", isOn: $autoLaunch).labelsHidden()
                             .onChange(of: autoLaunch, perform: setAutoLaunch)
                     }
                 }
 
-                SettingsGroup(title: "Горячая клавиша") {
-                    SettingsRow {
-                        HStack {
-                            Text("Сочетание клавиш")
-                            Spacer()
-                            Button(recordingHotkey ? "Нажмите клавиши…" : hotkeyDisplay) {
-                                recordingHotkey = true
-                            }
-                            .buttonStyle(.bordered)
-                            .foregroundColor(recordingHotkey ? .orange : .primary)
+                PrefSection(title: "Горячая клавиша") {
+                    PrefRow("Показать окно сниппетов") {
+                        Button(recordingHotkey ? "Нажмите клавиши…" : hotkeyDisplay) {
+                            recordingHotkey = true
                         }
-                    }
-                    if recordingHotkey {
-                        SettingsRow {
-                            Text("Нажмите любое сочетание клавиш с модификатором (⌘, ⌥, ⌃, ⇧)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        .buttonStyle(.bordered)
+                        .foregroundColor(recordingHotkey ? .orange : .primary)
+                        .animation(nil, value: recordingHotkey)
                     }
                 }
+
+                if recordingHotkey {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle").foregroundColor(.secondary)
+                        Text("Нажмите сочетание клавиш с модификатором (⌘, ⌥, ⌃ или ⇧)")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 2)
+                }
             }
-            .padding(20)
+            .padding(24)
         }
-        .background(.clear)
         .onAppear {
             autoLaunch = isAutoLaunchEnabled()
             NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 guard self.recordingHotkey else { return event }
-                let mods = event.modifierFlags.carbonFlags
-                HotkeyManager.saveHotkey(keyCode: Int(event.keyCode), modifiers: UInt32(mods))
+                HotkeyManager.saveHotkey(keyCode: Int(event.keyCode),
+                                         modifiers: UInt32(event.modifierFlags.carbonFlags))
                 self.hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
                 self.recordingHotkey = false
                 HotkeyManager.shared.register()
@@ -149,10 +132,8 @@ struct GeneralTab: View {
         if #available(macOS 13, *) { return SMAppService.mainApp.status == .enabled }
         return false
     }
-    private func setAutoLaunch(_ enabled: Bool) {
-        if #available(macOS 13, *) {
-            try? enabled ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
-        }
+    private func setAutoLaunch(_ v: Bool) {
+        if #available(macOS 13, *) { try? v ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
     }
 }
 
@@ -164,41 +145,35 @@ struct AppearanceTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                SettingsGroup(title: "Шрифт") {
-                    SettingsRow {
-                        HStack {
-                            Text("Размер шрифта")
-                            Spacer()
+            VStack(alignment: .leading, spacing: 24) {
+                PrefSection(title: "Шрифт в окне сниппетов") {
+                    PrefRow("Размер") {
+                        HStack(spacing: 10) {
+                            Text("А").font(.system(size: 11)).foregroundColor(.secondary)
+                            Slider(value: $fontSize, in: 10...18, step: 1).frame(width: 160)
+                            Text("А").font(.system(size: 17)).foregroundColor(.secondary)
                             Text("\(Int(fontSize)) пт")
                                 .foregroundColor(.secondary)
                                 .monospacedDigit()
+                                .frame(width: 38, alignment: .leading)
                         }
                     }
-                    SettingsRow {
-                        HStack(spacing: 10) {
-                            Text("А").font(.system(size: 10)).foregroundColor(.secondary)
-                            Slider(value: $fontSize, in: 10...18, step: 1)
-                            Text("А").font(.system(size: 18)).foregroundColor(.secondary)
-                        }
-                    }
-                    SettingsRow {
-                        Text("Пример текста сниппета")
+                    Divider().padding(.leading, 16)
+                    PrefRow("Предпросмотр") {
+                        Text("Пример сниппета")
                             .font(.system(size: fontSize))
                             .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                SettingsGroup(title: "Отображение") {
-                    SettingsRow {
-                        Toggle("Показывать только название (без превью содержимого)", isOn: $titleOnly)
+                PrefSection(title: "Список сниппетов") {
+                    PrefRow("Показывать только название") {
+                        Toggle("", isOn: $titleOnly).labelsHidden()
                     }
                 }
             }
-            .padding(20)
+            .padding(24)
         }
-        .background(.clear)
     }
 }
 
@@ -210,156 +185,127 @@ struct SnippetsTab: View {
     @State private var selectedSnippetID: UUID?
     @State private var newSectionName = ""
 
-    private var selectedSectionIndex: Int? {
-        store.sections.firstIndex { $0.id == selectedSectionID }
-    }
+    private var sectionIndex: Int? { store.sections.firstIndex { $0.id == selectedSectionID } }
 
     var body: some View {
         HStack(spacing: 0) {
-            sectionsColumn
-            Divider().opacity(0.4)
-            if let idx = selectedSectionIndex {
-                SnippetsColumn(
-                    section: $store.sections[idx],
-                    selectedSnippetID: $selectedSnippetID
-                )
-            } else {
-                centeredPlaceholder("Выберите раздел")
-            }
-        }
-        .background(.clear)
-    }
-
-    private var sectionsColumn: some View {
-        VStack(spacing: 0) {
-            Text("Разделы")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-            Divider().opacity(0.3)
-
-            List(selection: $selectedSectionID) {
-                ForEach(store.sections) { section in
-                    Text(section.name)
-                        .tag(section.id)
-                        .lineLimit(1)
-                }
-                .onMove { from, to in store.sections.move(fromOffsets: from, toOffset: to) }
-                .onDelete { store.sections.remove(atOffsets: $0) }
-            }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-
-            Divider().opacity(0.3)
-
-            HStack(spacing: 6) {
-                TextField("Новый раздел", text: $newSectionName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
-                    .onSubmit { addSection() }
-                Button(action: addSection) {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.bordered)
-                .disabled(newSectionName.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            .padding(10)
-        }
-        .frame(width: 165)
-        .background(.ultraThinMaterial)
-    }
-
-    private func addSection() {
-        let name = newSectionName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        let s = SnippetSection(name: name, snippets: [])
-        store.sections.append(s)
-        selectedSectionID = s.id
-        newSectionName = ""
-    }
-}
-
-struct SnippetsColumn: View {
-    @Binding var section: SnippetSection
-    @Binding var selectedSnippetID: UUID?
-
-    private var selectedSnippetIndex: Int? {
-        section.snippets.firstIndex { $0.id == selectedSnippetID }
-    }
-
-    var body: some View {
-        HSplitView {
-            snippetList
-            if let idx = selectedSnippetIndex {
-                SnippetEditorPanel(snippet: $section.snippets[idx])
-                    .frame(minWidth: 190)
-            } else {
-                centeredPlaceholder("Выберите сниппет")
-                    .frame(minWidth: 190)
-            }
-        }
-    }
-
-    private var snippetList: some View {
-        VStack(spacing: 0) {
-            Text(section.name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-            Divider().opacity(0.3)
-
-            List(selection: $selectedSnippetID) {
-                ForEach(section.snippets) { snippet in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(snippet.title)
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                        Text(snippet.content)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
+            // Column 1 — sections
+            VStack(spacing: 0) {
+                List(selection: $selectedSectionID) {
+                    ForEach(store.sections) { s in
+                        Label(s.name, systemImage: "folder")
+                            .tag(s.id)
                     }
-                    .tag(snippet.id)
-                    .padding(.vertical, 2)
+                    .onMove { store.sections.move(fromOffsets: $0, toOffset: $1) }
+                    .onDelete { store.sections.remove(atOffsets: $0) }
                 }
-                .onMove { from, to in section.snippets.move(fromOffsets: from, toOffset: to) }
-                .onDelete { section.snippets.remove(atOffsets: $0) }
+                .listStyle(.sidebar)
+
+                Divider()
+                HStack(spacing: 0) {
+                    ToolbarButton(icon: "plus") {
+                        let s = SnippetSection(name: "Новый раздел", snippets: [])
+                        store.sections.append(s)
+                        selectedSectionID = s.id
+                    }
+                    ToolbarButton(icon: "minus") {
+                        guard let id = selectedSectionID else { return }
+                        store.sections.removeAll { $0.id == id }
+                        selectedSectionID = nil
+                    }
+                    .disabled(selectedSectionID == nil)
+                    Spacer()
+                }
+                .frame(height: 28)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
+            .frame(width: 168)
 
-            Divider().opacity(0.3)
+            Divider()
 
-            HStack(spacing: 2) {
-                Button {
-                    let s = Snippet(title: "Новый сниппет", content: "")
-                    section.snippets.append(s)
-                    selectedSnippetID = s.id
-                } label: { Image(systemName: "plus") }
-                .buttonStyle(.borderless)
-                .padding(4)
+            // Column 2 — snippets
+            if let idx = sectionIndex {
+                VStack(spacing: 0) {
+                    // Editable section name
+                    HStack {
+                        Image(systemName: "folder").foregroundColor(.secondary).font(.caption)
+                        TextField("Название раздела", text: $store.sections[idx].name)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                        Text("\(store.sections[idx].snippets.count)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.trailing, 4)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(NSColor.windowBackgroundColor))
 
-                Button {
-                    guard let id = selectedSnippetID else { return }
-                    section.snippets.removeAll { $0.id == id }
-                    selectedSnippetID = nil
-                } label: { Image(systemName: "minus") }
-                .buttonStyle(.borderless)
-                .padding(4)
-                .disabled(selectedSnippetID == nil)
+                    Divider()
 
-                Spacer()
+                    List(selection: $selectedSnippetID) {
+                        ForEach(store.sections[idx].snippets) { snippet in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(snippet.title)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .lineLimit(1)
+                                Text(snippet.content)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .tag(snippet.id)
+                            .padding(.vertical, 1)
+                        }
+                        .onMove { store.sections[idx].snippets.move(fromOffsets: $0, toOffset: $1) }
+                        .onDelete { store.sections[idx].snippets.remove(atOffsets: $0) }
+                    }
+                    .listStyle(.plain)
+
+                    Divider()
+                    HStack(spacing: 0) {
+                        ToolbarButton(icon: "plus") {
+                            let s = Snippet(title: "Новый сниппет", content: "")
+                            store.sections[idx].snippets.append(s)
+                            selectedSnippetID = s.id
+                        }
+                        ToolbarButton(icon: "minus") {
+                            guard let id = selectedSnippetID else { return }
+                            store.sections[idx].snippets.removeAll { $0.id == id }
+                            selectedSnippetID = nil
+                        }
+                        .disabled(selectedSnippetID == nil)
+                        Spacer()
+                    }
+                    .frame(height: 28)
+                }
+                .frame(width: 200)
+
+                Divider()
+
+                // Column 3 — editor
+                if let sID = selectedSnippetID,
+                   let sIdx = store.sections[idx].snippets.firstIndex(where: { $0.id == sID }) {
+                    SnippetEditorPanel(snippet: $store.sections[idx].snippets[sIdx])
+                } else {
+                    VStack {
+                        Spacer()
+                        Image(systemName: "doc.text").font(.system(size: 32)).foregroundColor(.secondary.opacity(0.4))
+                        Text("Выберите сниппет").foregroundColor(.secondary).padding(.top, 8)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            } else {
+                VStack {
+                    Spacer()
+                    Image(systemName: "folder").font(.system(size: 32)).foregroundColor(.secondary.opacity(0.4))
+                    Text("Выберите раздел").foregroundColor(.secondary).padding(.top, 8)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
         }
-        .frame(minWidth: 150)
     }
 }
 
@@ -367,37 +313,65 @@ struct SnippetEditorPanel: View {
     @Binding var snippet: Snippet
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Название")
+        VStack(alignment: .leading, spacing: 0) {
+            // Title field
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Название", systemImage: "tag")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 TextField("Название сниппета", text: $snippet.title)
                     .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 13))
             }
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Содержимое")
+            .padding([.horizontal, .top], 16)
+            .padding(.bottom, 12)
+
+            Divider().padding(.horizontal, 16)
+
+            // Content editor
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Содержимое", systemImage: "text.alignleft")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .padding(.top, 12)
+
                 TextEditor(text: $snippet.content)
                     .font(.system(size: 13, design: .monospaced))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scrollContentBackground(.hidden)
-                    .background(Color.primary.opacity(0.04))
-                    .cornerRadius(6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                    )
+                    .padding(8)
+                    .background(Color(NSColor.textBackgroundColor).opacity(0.6))
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
-        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-// MARK: - Reusable settings UI
+struct ToolbarButton: View {
+    let icon: String
+    var isDisabled: Bool = false
+    let action: () -> Void
 
-struct SettingsGroup<Content: View>: View {
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .disabled(isDisabled)
+    }
+}
+
+// MARK: - Preference UI helpers
+
+struct PrefSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
 
@@ -406,61 +380,42 @@ struct SettingsGroup<Content: View>: View {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.secondary)
-                .padding(.leading, 4)
+                .padding(.leading, 2)
                 .padding(.bottom, 6)
 
             VStack(spacing: 0) {
                 content()
             }
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 1)
-            )
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5))
         }
     }
 }
 
-struct SettingsRow<Content: View>: View {
-    @ViewBuilder let content: () -> Content
+struct PrefRow<Control: View>: View {
+    let label: String
+    @ViewBuilder let control: () -> Control
+
+    init(_ label: String, @ViewBuilder control: @escaping () -> Control) {
+        self.label = label
+        self.control = control
+    }
 
     var body: some View {
-        content()
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(Divider().padding(.leading, 14), alignment: .bottom)
-    }
-}
-
-// MARK: - NSVisualEffectView wrapper
-
-struct SettingsVibrancy: NSViewRepresentable {
-    var material: NSVisualEffectView.Material
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.blendingMode = .behindWindow
-        v.material = material
-        v.state = .active
-        return v
-    }
-    func updateNSView(_ v: NSVisualEffectView, context: Context) {
-        v.material = material
+        HStack {
+            Text(label)
+                .font(.system(size: 13))
+            Spacer()
+            control()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 }
 
 // MARK: - Helpers
-
-private func centeredPlaceholder(_ text: String) -> some View {
-    VStack {
-        Spacer()
-        Text(text).foregroundColor(.secondary)
-        Spacer()
-    }
-    .frame(maxWidth: .infinity)
-}
 
 private extension NSEvent.ModifierFlags {
     var carbonFlags: Int {
