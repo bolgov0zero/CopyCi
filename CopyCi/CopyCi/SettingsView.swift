@@ -26,8 +26,8 @@ struct SettingsView: View {
             Divider().opacity(0.3)
             content
         }
+        .background(Color(NSColor.windowBackgroundColor))
         .frame(width: 560)
-        .background(.clear)
     }
 
     // MARK: Toolbar (Little Snitch style)
@@ -58,7 +58,7 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(.vertical, 8)
-        .background(.clear)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
     @ViewBuilder
@@ -91,7 +91,10 @@ struct FormBlock<Content: View>: View {
             VStack(spacing: 0) {
                 content()
             }
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
 
             if let note {
                 Text(note)
@@ -367,8 +370,8 @@ struct SnippetsTab: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(.clear)
-            .overlay(Divider().opacity(0.3), alignment: .bottom)
+            .background(Color(NSColor.windowBackgroundColor))
+            .overlay(Divider(), alignment: .bottom)
     }
 
     private func listToolbar(onAdd: @escaping () -> Void, onRemove: (() -> Void)?) -> some View {
@@ -396,8 +399,8 @@ struct SnippetsTab: View {
         }
         .padding(.leading, 4)
         .frame(height: 28)
-        .background(.clear)
-        .overlay(Divider().opacity(0.3), alignment: .top)
+        .background(Color(NSColor.windowBackgroundColor))
+        .overlay(Divider(), alignment: .top)
     }
 
     private func emptyCol(icon: String, text: String) -> some View {
@@ -410,7 +413,7 @@ struct SnippetsTab: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.clear)
+        .background(Color(NSColor.textBackgroundColor).opacity(0.3))
     }
 }
 
@@ -472,7 +475,7 @@ struct SnippetEditor: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(.clear)
+            .background(Color(NSColor.windowBackgroundColor))
 
             Divider()
 
@@ -493,7 +496,7 @@ struct SnippetEditor: View {
                     .padding(.vertical, 8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.clear)
+            .background(Color(NSColor.textBackgroundColor).opacity(0.5))
 
             Divider()
 
@@ -509,7 +512,7 @@ struct SnippetEditor: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(.clear)
+            .background(Color(NSColor.windowBackgroundColor))
         }
         .frame(maxWidth: .infinity)
     }

@@ -60,24 +60,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 defer: false
             )
             window.title = "Настройки CopyCi"
-            window.backgroundColor = .clear
-            window.isOpaque = false
-
-            // Liquid glass: NSVisualEffectView as base + SwiftUI on top
-            let effect = NSVisualEffectView(frame: .zero)
-            effect.blendingMode = .behindWindow
-            effect.state = .active
-            effect.material = .underWindowBackground
-            let hosting = NSHostingView(rootView: SettingsView())
-            hosting.translatesAutoresizingMaskIntoConstraints = false
-            effect.addSubview(hosting)
-            NSLayoutConstraint.activate([
-                hosting.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
-                hosting.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
-                hosting.topAnchor.constraint(equalTo: effect.topAnchor),
-                hosting.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
-            ])
-            window.contentView = effect
+            window.backgroundColor = NSColor.windowBackgroundColor
+            window.contentView = NSHostingView(rootView: SettingsView())
             window.center()
             window.isReleasedWhenClosed = false
             settingsWindow = window
@@ -174,7 +158,7 @@ class SnippetsPanel: NSPanel {
 
         super.init(
             contentRect: NSRect(origin: .zero, size: savedSize),
-            styleMask: [.borderless, .resizable],
+            styleMask: [.titled, .fullSizeContentView, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -189,17 +173,18 @@ class SnippetsPanel: NSPanel {
         backgroundColor = .clear
         isOpaque = false
         hasShadow = true
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
         minSize = NSSize(width: 240, height: 180)
 
         let view = SnippetsView(
             onPaste: { [weak self] content in self?.onPaste?(content) },
             onClose: { [weak self] in self?.onClose?() }
         )
-        let hostingView = NSHostingView(rootView: view)
-        hostingView.wantsLayer = true
-        hostingView.layer?.backgroundColor = CGColor.clear
-        hostingView.layer?.isOpaque = false
-        contentView = hostingView
+        contentView = NSHostingView(rootView: view)
     }
 
     func showNear(point: NSPoint) {

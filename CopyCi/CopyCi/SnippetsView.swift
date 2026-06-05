@@ -14,13 +14,15 @@ struct SnippetsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            snippetsList
-            Divider().opacity(0.3)
-            sectionTabs
+        ZStack {
+            VisualEffectBackground().ignoresSafeArea()
+            VStack(spacing: 0) {
+                snippetsList
+                Divider().background(Color.white.opacity(0.1))
+                sectionTabs
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
         .onChange(of: store.sections.count) { _ in
             if selectedSectionIndex >= store.sections.count {
                 selectedSectionIndex = max(0, store.sections.count - 1)
@@ -109,7 +111,7 @@ struct TagButton: View {
             .padding(.vertical, fontSize * 0.3)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.clear)
+                    .fill(isSelected ? Color.white.opacity(0.15) : Color.clear)
             )
         }
         .buttonStyle(.plain)
@@ -161,11 +163,22 @@ struct SnippetRow: View {
             .padding(.vertical, titleOnly ? 6 : 7)
             .background(
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(hovered ? Color.white.opacity(0.15) : Color.clear)
+                    .fill(hovered ? Color.accentColor.opacity(0.25) : Color.clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
     }
+}
+
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.blendingMode = .behindWindow
+        v.state = .active
+        v.material = .hudWindow
+        return v
+    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

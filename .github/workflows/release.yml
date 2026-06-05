@@ -16,21 +16,13 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: |
-          # Find Xcode 26 (exact path may vary between runners)
-          XCODE=$(ls /Applications/ | grep -E "^Xcode_26|^Xcode 26" | head -1)
-          if [ -n "$XCODE" ]; then
-            sudo xcode-select -s "/Applications/$XCODE"
-          else
-            sudo xcode-select -s /Applications/Xcode.app
-          fi
-          xcodebuild -version
+        run: sudo xcode-select -s /Applications/Xcode_16.app
 
       - name: Set version
         id: version
