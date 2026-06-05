@@ -212,17 +212,25 @@ class SnippetsPanel: NSPanel {
             }
 
             // 1–9, 0 without modifiers → quick paste
+            // Key "1"→index 0, "2"→1, …, "9"→8, "0"→9
             let numberMap: [UInt16: Int] = [
-                18: 0, 19: 1, 20: 2, 21: 3, 23: 4,
-                22: 5, 26: 6, 28: 7, 25: 8, 29: 9
+                18: 0,  // 1
+                19: 1,  // 2
+                20: 2,  // 3
+                21: 3,  // 4
+                23: 4,  // 5
+                22: 5,  // 6
+                26: 6,  // 7
+                28: 7,  // 8
+                25: 8,  // 9
+                29: 9,  // 0
             ]
-            if let pos = numberMap[event.keyCode],
+            if let snippetIdx = numberMap[event.keyCode],
                event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
                 let store = SnippetStore.shared
                 let sectionIdx = UserDefaults.standard.integer(forKey: "selectedSection")
                 guard sectionIdx < store.sections.count else { return nil }
                 let snippets = store.sections[sectionIdx].snippets
-                let snippetIdx = pos == 0 ? 9 : pos - 1
                 guard snippetIdx < snippets.count else { return nil }
                 self.onPaste?(snippets[snippetIdx].content)
                 return nil
