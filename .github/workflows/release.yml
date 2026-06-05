@@ -1,0 +1,103 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project CopyCi/CopyCi.xcodeproj \
+            -scheme CopyCi \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="${{ steps.version.outputs.VERSION }}"
+
+      - name: Locate app
+        id: app
+        run: |
+          APP=$(find build -name "CopyCi.app" -type d | head -1)
+          echo "APP_PATH=$APP" >> $GITHUB_OUTPUT
+          echo "Found: $APP"
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          mkdir -p dist
+          create-dmg \
+            --volname "CopyCi" \
+            --volicon "${{ steps.app.outputs.APP_PATH }}/Contents/Resources/AppIcon.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "CopyCi.app" 175 190 \
+            --hide-extension "CopyCi.app" \
+            --app-drop-link 425 190 \
+            "dist/CopyCi-${{ steps.version.outputs.VERSION }}.dmg" \
+            "${{ steps.app.outputs.APP_PATH }}" \
+          || true
+          # Fallback: plain DMG if create-dmg fails (no icon)
+          if [ ! -f "dist/CopyCi-${{ steps.version.outputs.VERSION }}.dmg" ]; then
+            hdiutil create \
+              -volname "CopyCi" \
+              -srcfolder "${{ steps.app.outputs.APP_PATH }}" \
+              -ov -format UDZO \
+              "dist/CopyCi-${{ steps.version.outputs.VERSION }}.dmg"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: CopyCi v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## CopyCi v${{ steps.version.outputs.VERSION }}
+
+            Minimalist snippet manager for macOS.
+
+            ### Install
+            1. Download the `.dmg` file
+            2. Open it and drag **CopyCi.app** to Applications
+            3. Launch CopyCi — it appears in the menu bar
+            4. Grant **Accessibility** permissions in System Settings when prompted
+
+            ### Usage
+            - **Left click** menu bar icon → snippet picker
+            - **Right click** menu bar icon → Settings / Quit
+            - Default hotkey: **⌘⇧Space**
+          files: dist/*.dmg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
