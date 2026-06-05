@@ -3,96 +3,163 @@ import SwiftUI
 struct SnippetsView: View {
     @ObservedObject var store = SnippetStore.shared
     @State private var selectedSectionIndex: Int = 0
+    @AppStorage("fontSize") private var fontSize: Double = 13
     var onPaste: (() -> Void)?
 
+    private var currentSnippets: [Snippet] {
+        guard selectedSectionIndex < store.sections.count else { return [] }
+        return store.sections[selectedSectionIndex].snippets
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            snippetsList
-            Divider()
-            sectionTabs
+        ZStack {
+            VisualEffectBackground()
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                snippetsList
+                Divider()
+                    .background(Color.white.opacity(0.1))
+                sectionTabs
+            }
         }
-        .frame(width: 320, height: 380)
-        .background(Color(NSColor.windowBackgroundColor))
+        .frame(width: 340, height: 400)
     }
 
     private var snippetsList: some View {
         ScrollView {
-            LazyVStack(spacing: 1) {
-                if store.sections.isEmpty {
-                    Text("No snippets yet.\nAdd them in Settings.")
+            VStack(spacing: 2) {
+                if currentSnippets.isEmpty {
+                    Text("No snippets.\nAdd them in Settings.")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.top, 40)
-                } else if selectedSectionIndex < store.sections.count {
-                    ForEach(store.sections[selectedSectionIndex].snippets) { snippet in
-                        SnippetRow(snippet: snippet, onPaste: onPaste)
+                        .padding(.top, 50)
+                        .font(.system(size: fontSize))
+                } else {
+                    ForEach(Array(currentSnippets.enumerated()), id: \.element.id) { index, snippet in
+                        SnippetRow(
+                            index: index,
+                            snippet: snippet,
+                            fontSize: fontSize,
+                            onPaste: onPaste
+                        )
                     }
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 6)
         }
     }
 
     private var sectionTabs: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
+            HStack(spacing: 6) {
                 ForEach(Array(store.sections.enumerated()), id: \.element.id) { index, section in
-                    Button(action: { selectedSectionIndex = index }) {
-                        Text(section.name)
-                            .font(.system(size: 12, weight: selectedSectionIndex == index ? .semibold : .regular))
-                            .foregroundColor(selectedSectionIndex == index ? .primary : .secondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(
-                                selectedSectionIndex == index
-                                    ? Color.accentColor.opacity(0.12)
-                                    : Color.clear
-                            )
+                    TagButton(
+                        title: section.name,
+                        color: tagColor(for: index),
+                        isSelected: selectedSectionIndex == index
+                    ) {
+                        selectedSectionIndex = index
                     }
-                    .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .frame(height: 36)
+        .frame(height: 38)
+    }
+
+    private func tagColor(for index: Int) -> Color {
+        let colors: [Color] = [.blue, .orange, .green, .purple, .pink, .yellow, .cyan, .red]
+        return colors[index % colors.count]
+    }
+}
+
+struct TagButton: View {
+    let title: String
+    let color: Color
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+                Text(title)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? .primary : .secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
 struct SnippetRow: View {
+    let index: Int
     let snippet: Snippet
+    let fontSize: Double
     var onPaste: (() -> Void)?
     @State private var hovered = false
+
+    private var indexLabel: String {
+        index < 9 ? "\(index + 1)" : "0"
+    }
 
     var body: some View {
         Button(action: {
             onPaste?()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                 PasteManager.paste(snippet.content)
             }
         }) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                Text(indexLabel)
+                    .font(.system(size: fontSize - 1, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .frame(width: 16, alignment: .trailing)
+
+                VStack(alignment: .leading, spacing: 1) {
                     Text(snippet.title)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: fontSize, weight: .medium))
                         .foregroundColor(.primary)
+                        .lineLimit(1)
                     Text(snippet.content)
-                        .font(.system(size: 11))
+                        .font(.system(size: fontSize - 2))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
+
                 Spacer()
-                Image(systemName: "doc.on.clipboard")
-                    .foregroundColor(.secondary)
-                    .opacity(hovered ? 1 : 0)
-                    .font(.system(size: 12))
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(hovered ? Color.accentColor.opacity(0.08) : Color.clear)
-            .cornerRadius(6)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(hovered ? Color.accentColor.opacity(0.25) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 6)
         .onHover { hovered = $0 }
     }
+}
+
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.material = .hudWindow
+        return view
+    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

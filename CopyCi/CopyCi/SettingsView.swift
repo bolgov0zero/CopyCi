@@ -4,6 +4,7 @@ import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject var store = SnippetStore.shared
+    @AppStorage("fontSize") private var fontSize: Double = 13
     @State private var autoLaunch: Bool = false
     @State private var recordingHotkey = false
     @State private var hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
@@ -23,12 +24,14 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     generalSection
                     Divider()
+                    appearanceSection
+                    Divider()
                     snippetsSection
                 }
                 .padding(20)
             }
         }
-        .frame(width: 480, height: 520)
+        .frame(width: 480, height: 560)
         .onAppear { autoLaunch = isAutoLaunchEnabled() }
     }
 
@@ -49,6 +52,31 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
                 .onAppear { setupHotkeyRecording() }
             }
+        }
+    }
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Appearance", systemImage: "textformat.size")
+                .font(.headline)
+
+            HStack {
+                Text("Font size")
+                Spacer()
+                Text("\(Int(fontSize)) pt")
+                    .foregroundColor(.secondary)
+                    .frame(width: 40, alignment: .trailing)
+            }
+            HStack(spacing: 8) {
+                Text("A").font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                Slider(value: $fontSize, in: 10...18, step: 1)
+                Text("A").font(.system(size: 18))
+                    .foregroundColor(.secondary)
+            }
+            Text("Preview: Hello, World!")
+                .font(.system(size: fontSize))
+                .foregroundColor(.secondary)
         }
     }
 

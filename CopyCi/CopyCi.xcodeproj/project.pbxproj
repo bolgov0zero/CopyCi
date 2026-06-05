@@ -15,6 +15,7 @@
 		A006 /* SnippetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F006 /* SnippetsView.swift */; };
 		A007 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F007 /* SettingsView.swift */; };
 		A010 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F010 /* Carbon.framework */; };
+		A011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F012 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 		F008 /* CopyCi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CopyCi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F010 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		F011 /* CopyCi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CopyCi.entitlements; sourceTree = "<group>"; };
+		F012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +64,7 @@
 				F006 /* SnippetsView.swift */,
 				F007 /* SettingsView.swift */,
 				F011 /* CopyCi.entitlements */,
+				F012 /* Assets.xcassets */,
 			);
 			path = CopyCi;
 			sourceTree = "<group>";
@@ -92,6 +95,7 @@
 				B001 /* Sources */,
 				B002 /* Frameworks */,
 				B003 /* Frameworks */,
+				B004 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -158,6 +162,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A011 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		XC10 /* Debug */ = {

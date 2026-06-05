@@ -89,7 +89,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             panel.level = .floating
             panel.collectionBehavior = [.canJoinAllSpaces, .transient]
             panel.isReleasedWhenClosed = false
-            panel.backgroundColor = NSColor.windowBackgroundColor
+            panel.backgroundColor = .clear
 
             let view = SnippetsView(onPaste: { [weak panel] in
                 panel?.orderOut(nil)
