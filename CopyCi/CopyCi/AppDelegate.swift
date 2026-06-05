@@ -104,6 +104,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snippetsPanel?.showNear(point: point)
         NSApp.activate(ignoringOtherApps: true)
         snippetsPanel?.makeKeyAndOrderFront(nil)
+        snippetsPanel?.startKeyMonitor()
 
         startClickOutsideMonitor()
     }
@@ -196,14 +197,13 @@ class SnippetsPanel: NSPanel {
         if origin.x < sf.minX { origin.x = sf.minX + 8 }
 
         setFrameOrigin(origin)
-        startKeyMonitor()
     }
 
-    // Local monitor intercepts events BEFORE SwiftUI's NSHostingView consumes them
-    private func startKeyMonitor() {
+    // Called from AppDelegate AFTER makeKeyAndOrderFront
+    func startKeyMonitor() {
         stopKeyMonitor()
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.isVisible else { return event }
+            guard let self else { return event }
 
             // Esc → close
             if event.keyCode == 53 {
@@ -232,7 +232,7 @@ class SnippetsPanel: NSPanel {
         }
     }
 
-    private func stopKeyMonitor() {
+    func stopKeyMonitor() {
         if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
     }
 
