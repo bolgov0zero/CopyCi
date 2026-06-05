@@ -5,7 +5,8 @@ struct SnippetsView: View {
     @AppStorage("selectedSection") private var selectedSectionIndex: Int = 0
     @AppStorage("fontSize") private var fontSize: Double = 13
     @AppStorage("titleOnly") private var titleOnly: Bool = false
-    var onPaste: (() -> Void)?
+    var onPaste: ((String) -> Void)?
+    var onClose: (() -> Void)?
 
     private var currentSnippets: [Snippet] {
         guard selectedSectionIndex < store.sections.count else { return [] }
@@ -14,13 +15,11 @@ struct SnippetsView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectBackground()
-                .ignoresSafeArea()
+            VisualEffectBackground().ignoresSafeArea()
 
             VStack(spacing: 0) {
                 snippetsList
-                Divider()
-                    .background(Color.white.opacity(0.1))
+                Divider().background(Color.white.opacity(0.1))
                 sectionTabs
             }
         }
@@ -35,27 +34,34 @@ struct SnippetsView: View {
     private var snippetsList: some View {
         ScrollView {
             VStack(spacing: 2) {
-                if currentSnippets.isEmpty {
-                    Text("No snippets.\nAdd them in Settings.")
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 50)
-                        .font(.system(size: fontSize))
+                if store.sections.isEmpty {
+                    emptyState("No sections.\nAdd them in Settings.")
+                } else if currentSnippets.isEmpty {
+                    emptyState("No snippets in this section.\nAdd them in Settings.")
                 } else {
                     ForEach(Array(currentSnippets.enumerated()), id: \.element.id) { index, snippet in
                         SnippetRow(
                             index: index,
                             snippet: snippet,
                             fontSize: fontSize,
-                            titleOnly: titleOnly,
-                            onPaste: onPaste
-                        )
+                            titleOnly: titleOnly
+                        ) {
+                            onPaste?(snippet.content)
+                        }
                     }
                 }
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 6)
         }
+    }
+
+    private func emptyState(_ text: String) -> some View {
+        Text(text)
+            .foregroundColor(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.top, 50)
+            .font(.system(size: fontSize))
     }
 
     private var sectionTabs: some View {
@@ -92,9 +98,7 @@ struct TagButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 7, height: 7)
+                Circle().fill(color).frame(width: 7, height: 7)
                 Text(title)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .primary : .secondary)
@@ -102,8 +106,8 @@ struct TagButton: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
-                Capsule()
-                    .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.white.opacity(0.15) : Color.clear)
             )
         }
         .buttonStyle(.plain)
@@ -115,20 +119,17 @@ struct SnippetRow: View {
     let snippet: Snippet
     let fontSize: Double
     let titleOnly: Bool
-    var onPaste: (() -> Void)?
+    let action: () -> Void
     @State private var hovered = false
 
     private var indexLabel: String {
-        index < 9 ? "\(index + 1)" : (index == 9 ? "0" : "")
+        if index < 9 { return "\(index + 1)" }
+        if index == 9 { return "0" }
+        return ""
     }
 
     var body: some View {
-        Button(action: {
-            onPaste?()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                PasteManager.paste(snippet.content)
-            }
-        }) {
+        Button(action: action) {
             HStack(spacing: 10) {
                 Text(indexLabel)
                     .font(.system(size: fontSize - 1, weight: .medium, design: .monospaced))
@@ -152,7 +153,6 @@ struct SnippetRow: View {
                             .lineLimit(1)
                     }
                 }
-
                 Spacer()
             }
             .padding(.horizontal, 12)
@@ -170,11 +170,11 @@ struct SnippetRow: View {
 
 struct VisualEffectBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.material = .hudWindow
-        return view
+        let v = NSVisualEffectView()
+        v.blendingMode = .behindWindow
+        v.state = .active
+        v.material = .hudWindow
+        return v
     }
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

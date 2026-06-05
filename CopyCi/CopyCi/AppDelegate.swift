@@ -5,7 +5,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var snippetsPanel: SnippetsPanel?
     private var settingsWindow: NSWindow?
-    private var globalClickMonitor: Any?
+    private var previousApp: NSRunningApplication?
+    private var clickOutsideMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -77,39 +78,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func toggleSnippetsWindow(near point: NSPoint) {
         if let panel = snippetsPanel, panel.isVisible {
-            hideSnippetsPanel()
+            hideSnippetsPanel(restoreApp: true)
             return
         }
         showSnippetsWindow(near: point)
     }
 
     private func showSnippetsWindow(near point: NSPoint) {
+        // Remember which app was active so we can restore it before paste
+        previousApp = NSWorkspace.shared.frontmostApplication
+
+        // Always start on first section
+        UserDefaults.standard.set(0, forKey: "selectedSection")
+
         if snippetsPanel == nil {
-            snippetsPanel = SnippetsPanel(onClose: { [weak self] in
-                self?.hideSnippetsPanel()
+            snippetsPanel = SnippetsPanel(onPaste: { [weak self] content in
+                self?.pasteContent(content)
+            }, onClose: { [weak self] in
+                self?.hideSnippetsPanel(restoreApp: true)
             })
         }
+
         snippetsPanel?.showNear(point: point)
+        NSApp.activate(ignoringOtherApps: true)
+        snippetsPanel?.makeKeyAndOrderFront(nil)
+
         startClickOutsideMonitor()
     }
 
-    func hideSnippetsPanel() {
-        snippetsPanel?.orderOut(nil)
+    func hideSnippetsPanel(restoreApp: Bool) {
         stopClickOutsideMonitor()
+        snippetsPanel?.orderOut(nil)
+        if restoreApp {
+            previousApp?.activate(options: .activateIgnoringOtherApps)
+        }
+    }
+
+    private func pasteContent(_ content: String) {
+        hideSnippetsPanel(restoreApp: false)
+        // Restore previous app first, then paste
+        previousApp?.activate(options: .activateIgnoringOtherApps)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            PasteManager.paste(content)
+        }
     }
 
     private func startClickOutsideMonitor() {
         stopClickOutsideMonitor()
-        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.hideSnippetsPanel()
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self, let panel = self.snippetsPanel, panel.isVisible else { return }
+            // Check if click is outside panel frame (including resize handles)
+            let mousePos = NSEvent.mouseLocation
+            if !panel.frame.insetBy(dx: -10, dy: -10).contains(mousePos) {
+                self.hideSnippetsPanel(restoreApp: true)
+            }
         }
     }
 
     private func stopClickOutsideMonitor() {
-        if let monitor = globalClickMonitor {
-            NSEvent.removeMonitor(monitor)
-            globalClickMonitor = nil
-        }
+        if let m = clickOutsideMonitor { NSEvent.removeMonitor(m); clickOutsideMonitor = nil }
     }
 
     private func mousePosition() -> NSPoint { NSEvent.mouseLocation }
@@ -118,22 +145,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - SnippetsPanel
 
 class SnippetsPanel: NSPanel {
-    private var localKeyMonitor: Any?
+    var onPaste: ((String) -> Void)?
     var onClose: (() -> Void)?
 
-    init(onClose: @escaping () -> Void) {
-        // Restore saved size or use default
+    init(onPaste: @escaping (String) -> Void, onClose: @escaping () -> Void) {
         let savedSize = SnippetsPanel.savedSize()
-        let rect = NSRect(origin: .zero, size: savedSize)
 
         super.init(
-            contentRect: rect,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView, .resizable, .borderless],
+            contentRect: NSRect(origin: .zero, size: savedSize),
+            styleMask: [.titled, .fullSizeContentView, .resizable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
+        self.onPaste = onPaste
         self.onClose = onClose
+
         isReleasedWhenClosed = false
         isMovableByWindowBackground = true
         level = .floating
@@ -141,11 +168,17 @@ class SnippetsPanel: NSPanel {
         backgroundColor = .clear
         isOpaque = false
         hasShadow = true
-        minSize = NSSize(width: 260, height: 200)
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
+        minSize = NSSize(width: 240, height: 180)
 
-        let view = SnippetsView(onPaste: { [weak self] in
-            self?.onClose?()
-        })
+        let view = SnippetsView(
+            onPaste: { [weak self] content in self?.onPaste?(content) },
+            onClose: { [weak self] in self?.onClose?() }
+        )
         contentView = NSHostingView(rootView: view)
     }
 
@@ -160,59 +193,42 @@ class SnippetsPanel: NSPanel {
         if origin.x < sf.minX { origin.x = sf.minX + 8 }
 
         setFrameOrigin(origin)
-        orderFrontRegardless()
-        startKeyMonitor()
     }
 
+    override func keyDown(with event: NSEvent) {
+        // Esc
+        if event.keyCode == 53 {
+            onClose?()
+            return
+        }
+
+        // 1–9, 0 → quick paste
+        let numberMap: [UInt16: Int] = [
+            18: 0, 19: 1, 20: 2, 21: 3, 23: 4,
+            22: 5, 26: 6, 28: 7, 25: 8, 29: 9
+        ]
+        if let pos = numberMap[event.keyCode],
+           event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
+            let store = SnippetStore.shared
+            let sectionIdx = UserDefaults.standard.integer(forKey: "selectedSection")
+            guard sectionIdx < store.sections.count else { return }
+            let snippets = store.sections[sectionIdx].snippets
+            let snippetIdx = pos == 0 ? 9 : pos - 1
+            guard snippetIdx < snippets.count else { return }
+            onPaste?(snippets[snippetIdx].content)
+            return
+        }
+
+        super.keyDown(with: event)
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
     override func orderOut(_ sender: Any?) {
-        stopKeyMonitor()
         saveSize()
         super.orderOut(sender)
     }
-
-    // MARK: Key monitor (Esc + number shortcuts)
-
-    private func startKeyMonitor() {
-        stopKeyMonitor()
-        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.isVisible else { return event }
-
-            // Esc → close
-            if event.keyCode == 53 {
-                self.onClose?()
-                return nil
-            }
-
-            // 1–9, 0 → quick paste
-            let numberKeys: [UInt16: Int] = [
-                18: 0, 19: 1, 20: 2, 21: 3, 23: 4,
-                22: 5, 26: 6, 28: 7, 25: 8, 29: 9
-            ]
-            if let idx = numberKeys[event.keyCode], event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
-                let store = SnippetStore.shared
-                let selectedSection = UserDefaults.standard.integer(forKey: "selectedSection")
-                guard selectedSection < store.sections.count else { return nil }
-                let snippets = store.sections[selectedSection].snippets
-                let snippetIndex = idx == 0 ? 9 : idx - 1
-                if snippetIndex < snippets.count {
-                    let content = snippets[snippetIndex].content
-                    self.onClose?()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                        PasteManager.paste(content)
-                    }
-                }
-                return nil
-            }
-
-            return event
-        }
-    }
-
-    private func stopKeyMonitor() {
-        if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
-    }
-
-    // MARK: Size persistence
 
     private func saveSize() {
         let s = frame.size
