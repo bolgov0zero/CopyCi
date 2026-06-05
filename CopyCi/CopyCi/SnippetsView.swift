@@ -65,22 +65,25 @@ struct SnippetsView: View {
     }
 
     private var sectionTabs: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+        let tagFont = max(9.0, fontSize - 2)
+        let tabHeight = tagFont + 20
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
                 ForEach(Array(store.sections.enumerated()), id: \.element.id) { index, section in
                     TagButton(
                         title: section.name,
                         color: tagColor(for: index),
-                        isSelected: selectedSectionIndex == index
+                        isSelected: selectedSectionIndex == index,
+                        fontSize: tagFont
                     ) {
                         selectedSectionIndex = index
                     }
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
         }
-        .frame(height: 38)
+        .frame(height: tabHeight)
     }
 
     private func tagColor(for index: Int) -> Color {
@@ -93,18 +96,20 @@ struct TagButton: View {
     let title: String
     let color: Color
     let isSelected: Bool
+    var fontSize: Double = 11
     let action: () -> Void
 
     var body: some View {
+        let dotSize = max(5.0, fontSize * 0.6)
         Button(action: action) {
-            HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 7, height: 7)
+            HStack(spacing: 3) {
+                Circle().fill(color).frame(width: dotSize, height: dotSize)
                 Text(title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: fontSize, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .primary : .secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, fontSize * 0.65)
+            .padding(.vertical, fontSize * 0.3)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(isSelected ? Color.white.opacity(0.15) : Color.clear)

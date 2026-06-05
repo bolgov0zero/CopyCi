@@ -149,6 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 class SnippetsPanel: NSPanel {
     var onPaste: ((String) -> Void)?
     var onClose: (() -> Void)?
+    private var keyMonitor: Any?
 
     init(onPaste: @escaping (String) -> Void, onClose: @escaping () -> Void) {
         let savedSize = SnippetsPanel.savedSize()
@@ -195,39 +196,51 @@ class SnippetsPanel: NSPanel {
         if origin.x < sf.minX { origin.x = sf.minX + 8 }
 
         setFrameOrigin(origin)
+        startKeyMonitor()
     }
 
-    override func keyDown(with event: NSEvent) {
-        // Esc
-        if event.keyCode == 53 {
-            onClose?()
-            return
-        }
+    // Local monitor intercepts events BEFORE SwiftUI's NSHostingView consumes them
+    private func startKeyMonitor() {
+        stopKeyMonitor()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.isVisible else { return event }
 
-        // 1–9, 0 → quick paste
-        let numberMap: [UInt16: Int] = [
-            18: 0, 19: 1, 20: 2, 21: 3, 23: 4,
-            22: 5, 26: 6, 28: 7, 25: 8, 29: 9
-        ]
-        if let pos = numberMap[event.keyCode],
-           event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
-            let store = SnippetStore.shared
-            let sectionIdx = UserDefaults.standard.integer(forKey: "selectedSection")
-            guard sectionIdx < store.sections.count else { return }
-            let snippets = store.sections[sectionIdx].snippets
-            let snippetIdx = pos == 0 ? 9 : pos - 1
-            guard snippetIdx < snippets.count else { return }
-            onPaste?(snippets[snippetIdx].content)
-            return
-        }
+            // Esc → close
+            if event.keyCode == 53 {
+                self.onClose?()
+                return nil
+            }
 
-        super.keyDown(with: event)
+            // 1–9, 0 without modifiers → quick paste
+            let numberMap: [UInt16: Int] = [
+                18: 0, 19: 1, 20: 2, 21: 3, 23: 4,
+                22: 5, 26: 6, 28: 7, 25: 8, 29: 9
+            ]
+            if let pos = numberMap[event.keyCode],
+               event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
+                let store = SnippetStore.shared
+                let sectionIdx = UserDefaults.standard.integer(forKey: "selectedSection")
+                guard sectionIdx < store.sections.count else { return nil }
+                let snippets = store.sections[sectionIdx].snippets
+                let snippetIdx = pos == 0 ? 9 : pos - 1
+                guard snippetIdx < snippets.count else { return nil }
+                self.onPaste?(snippets[snippetIdx].content)
+                return nil
+            }
+
+            return event
+        }
+    }
+
+    private func stopKeyMonitor() {
+        if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
     }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
     override func orderOut(_ sender: Any?) {
+        stopKeyMonitor()
         saveSize()
         super.orderOut(sender)
     }
