@@ -2,8 +2,9 @@ import SwiftUI
 
 struct SnippetsView: View {
     @ObservedObject var store = SnippetStore.shared
-    @State private var selectedSectionIndex: Int = 0
+    @AppStorage("selectedSection") private var selectedSectionIndex: Int = 0
     @AppStorage("fontSize") private var fontSize: Double = 13
+    @AppStorage("titleOnly") private var titleOnly: Bool = false
     var onPaste: (() -> Void)?
 
     private var currentSnippets: [Snippet] {
@@ -23,7 +24,12 @@ struct SnippetsView: View {
                 sectionTabs
             }
         }
-        .frame(width: 340, height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onChange(of: store.sections.count) { _ in
+            if selectedSectionIndex >= store.sections.count {
+                selectedSectionIndex = max(0, store.sections.count - 1)
+            }
+        }
     }
 
     private var snippetsList: some View {
@@ -41,6 +47,7 @@ struct SnippetsView: View {
                             index: index,
                             snippet: snippet,
                             fontSize: fontSize,
+                            titleOnly: titleOnly,
                             onPaste: onPaste
                         )
                     }
@@ -107,11 +114,12 @@ struct SnippetRow: View {
     let index: Int
     let snippet: Snippet
     let fontSize: Double
+    let titleOnly: Bool
     var onPaste: (() -> Void)?
     @State private var hovered = false
 
     private var indexLabel: String {
-        index < 9 ? "\(index + 1)" : "0"
+        index < 9 ? "\(index + 1)" : (index == 9 ? "0" : "")
     }
 
     var body: some View {
@@ -127,21 +135,28 @@ struct SnippetRow: View {
                     .foregroundColor(.secondary)
                     .frame(width: 16, alignment: .trailing)
 
-                VStack(alignment: .leading, spacing: 1) {
+                if titleOnly {
                     Text(snippet.title)
                         .font(.system(size: fontSize, weight: .medium))
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                    Text(snippet.content)
-                        .font(.system(size: fontSize - 2))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(snippet.title)
+                            .font(.system(size: fontSize, weight: .medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Text(snippet.content)
+                            .font(.system(size: fontSize - 2))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer()
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.vertical, titleOnly ? 6 : 7)
             .background(
                 RoundedRectangle(cornerRadius: 7)
                     .fill(hovered ? Color.accentColor.opacity(0.25) : Color.clear)

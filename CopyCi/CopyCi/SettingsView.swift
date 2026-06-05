@@ -5,6 +5,7 @@ import ServiceManagement
 struct SettingsView: View {
     @ObservedObject var store = SnippetStore.shared
     @AppStorage("fontSize") private var fontSize: Double = 13
+    @AppStorage("titleOnly") private var titleOnly: Bool = false
     @State private var autoLaunch: Bool = false
     @State private var recordingHotkey = false
     @State private var hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
@@ -77,6 +78,8 @@ struct SettingsView: View {
             Text("Preview: Hello, World!")
                 .font(.system(size: fontSize))
                 .foregroundColor(.secondary)
+
+            Toggle("Show title only (hide content preview)", isOn: $titleOnly)
         }
     }
 
