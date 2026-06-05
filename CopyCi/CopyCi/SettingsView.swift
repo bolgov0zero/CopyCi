@@ -2,145 +2,115 @@ import SwiftUI
 import Carbon
 import ServiceManagement
 
+// MARK: - Root
+
 struct SettingsView: View {
-    @ObservedObject var store = SnippetStore.shared
-    @AppStorage("fontSize") private var fontSize: Double = 13
-    @AppStorage("titleOnly") private var titleOnly: Bool = false
-    @State private var autoLaunch: Bool = false
-    @State private var recordingHotkey = false
-    @State private var hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
-    @State private var newSectionName = ""
-    @State private var expandedSections: Set<UUID> = []
+    @State private var tab: Tab = .general
+
+    enum Tab: String, CaseIterable {
+        case general    = "Основные"
+        case appearance = "Внешний вид"
+        case snippets   = "Сниппеты"
+
+        var icon: String {
+            switch self {
+            case .general:    return "gearshape"
+            case .appearance: return "paintbrush"
+            case .snippets:   return "doc.text"
+            }
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Settings")
-                .font(.title2).bold()
-                .padding([.top, .horizontal], 20)
-                .padding(.bottom, 12)
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    generalSection
-                    Divider()
-                    appearanceSection
-                    Divider()
-                    snippetsSection
-                }
-                .padding(20)
-            }
-        }
-        .frame(width: 480, height: 580)
-        .onAppear { autoLaunch = isAutoLaunchEnabled() }
-    }
-
-    // MARK: - General
-
-    private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("General", systemImage: "gear").font(.headline)
-
-            Toggle("Launch at Login", isOn: $autoLaunch)
-                .onChange(of: autoLaunch) { setAutoLaunch($0) }
-
-            HStack {
-                Text("Hotkey")
-                Spacer()
-                Button(recordingHotkey ? "Press keys…" : hotkeyDisplay) {
-                    recordingHotkey = true
-                }
-                .buttonStyle(.bordered)
-                .background(hotkeyRecorderSetup)
-            }
-        }
-    }
-
-    // Invisible view that sets up the key monitor once
-    private var hotkeyRecorderSetup: some View {
-        Color.clear
-            .frame(width: 0, height: 0)
-            .onAppear {
-                NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                    guard self.recordingHotkey else { return event }
-                    let mods = event.modifierFlags.carbonFlags
-                    let keyCode = Int(event.keyCode)
-                    HotkeyManager.saveHotkey(keyCode: keyCode, modifiers: UInt32(mods))
-                    self.hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
-                    self.recordingHotkey = false
-                    HotkeyManager.shared.register()
-                    return nil
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                ForEach(Tab.allCases, id: \.self) { t in
+                    TabBarItem(tab: t, isSelected: tab == t) { tab = t }
                 }
             }
-    }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
 
-    // MARK: - Appearance
+            Divider().padding(.top, 8)
 
-    private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Appearance", systemImage: "textformat.size").font(.headline)
-
-            HStack {
-                Text("Font size")
-                Spacer()
-                Text("\(Int(fontSize)) pt").foregroundColor(.secondary).frame(width: 40, alignment: .trailing)
+            Group {
+                switch tab {
+                case .general:    GeneralTab()
+                case .appearance: AppearanceTab()
+                case .snippets:   SnippetsTab()
+                }
             }
-            HStack(spacing: 8) {
-                Text("A").font(.system(size: 10)).foregroundColor(.secondary)
-                Slider(value: $fontSize, in: 10...18, step: 1)
-                Text("A").font(.system(size: 18)).foregroundColor(.secondary)
-            }
-            Text("Preview: Hello, World!")
-                .font(.system(size: fontSize))
-                .foregroundColor(.secondary)
-
-            Toggle("Show title only (hide content preview)", isOn: $titleOnly)
         }
+        .frame(width: 580, height: 500)
     }
+}
 
-    // MARK: - Snippets
+struct TabBarItem: View {
+    let tab: SettingsView.Tab
+    let isSelected: Bool
+    let action: () -> Void
 
-    private var snippetsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Snippets", systemImage: "doc.text").font(.headline)
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                Text(tab.rawValue)
+                    .font(.system(size: 11))
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+            }
+            .frame(width: 96, height: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
 
-            Text("Drag sections and snippets to reorder")
-                .font(.caption)
-                .foregroundColor(.secondary)
+// MARK: - Основные
 
-            List {
-                ForEach($store.sections) { $section in
-                    SectionEditor(
-                        section: $section,
-                        isExpanded: expandedSections.contains(section.id)
-                    ) {
-                        if expandedSections.contains(section.id) {
-                            expandedSections.remove(section.id)
-                        } else {
-                            expandedSections.insert(section.id)
-                        }
-                    } onDelete: {
-                        store.sections.removeAll { $0.id == section.id }
+struct GeneralTab: View {
+    @State private var autoLaunch = false
+    @State private var recordingHotkey = false
+    @State private var hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Запускать при входе в систему", isOn: $autoLaunch)
+                    .onChange(of: autoLaunch, perform: setAutoLaunch)
+            } header: {
+                Text("Запуск")
+            }
+
+            Section {
+                HStack {
+                    Text("Сочетание клавиш")
+                    Spacer()
+                    Button(recordingHotkey ? "Нажмите клавиши…" : hotkeyDisplay) {
+                        recordingHotkey = true
                     }
+                    .buttonStyle(.bordered)
+                    .foregroundColor(recordingHotkey ? .orange : .primary)
                 }
-                .onMove { from, to in
-                    store.sections.move(fromOffsets: from, toOffset: to)
-                }
+            } header: {
+                Text("Горячая клавиша")
             }
-            .listStyle(.inset)
-            .frame(minHeight: 100, maxHeight: 400)
-            .cornerRadius(8)
-
-            HStack {
-                TextField("New section name", text: $newSectionName)
-                    .textFieldStyle(.roundedBorder)
-                Button("Add Section") {
-                    let name = newSectionName.trimmingCharacters(in: .whitespaces)
-                    guard !name.isEmpty else { return }
-                    store.sections.append(SnippetSection(name: name, snippets: []))
-                    newSectionName = ""
-                }
-                .buttonStyle(.bordered)
-                .disabled(newSectionName.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            autoLaunch = isAutoLaunchEnabled()
+            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                guard self.recordingHotkey else { return event }
+                let mods = event.modifierFlags.carbonFlags
+                HotkeyManager.saveHotkey(keyCode: Int(event.keyCode), modifiers: UInt32(mods))
+                self.hotkeyDisplay = HotkeyManager.hotkeyDisplayString()
+                self.recordingHotkey = false
+                HotkeyManager.shared.register()
+                return nil
             }
         }
     }
@@ -157,113 +127,245 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - SectionEditor
+// MARK: - Внешний вид
 
-struct SectionEditor: View {
-    @Binding var section: SnippetSection
-    var isExpanded: Bool
-    var onToggle: () -> Void
-    var onDelete: () -> Void
-
-    @State private var newTitle = ""
-    @State private var newContent = ""
+struct AppearanceTab: View {
+    @AppStorage("fontSize") private var fontSize: Double = 13
+    @AppStorage("titleOnly") private var titleOnly: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                Button(action: onToggle) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11))
+        Form {
+            Section {
+                HStack {
+                    Text("Размер шрифта")
+                    Spacer()
+                    Text("\(Int(fontSize)) пт")
                         .foregroundColor(.secondary)
-                        .frame(width: 16)
+                        .monospacedDigit()
                 }
-                .buttonStyle(.plain)
-
-                TextField("Section name", text: $section.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .textFieldStyle(.plain)
-
-                Spacer()
-                Text("\(section.snippets.count)")
-                    .font(.caption)
+                HStack(spacing: 10) {
+                    Text("А").font(.system(size: 10)).foregroundColor(.secondary)
+                    Slider(value: $fontSize, in: 10...18, step: 1)
+                    Text("А").font(.system(size: 18)).foregroundColor(.secondary)
+                }
+                Text("Пример текста сниппета")
+                    .font(.system(size: fontSize))
                     .foregroundColor(.secondary)
-                    .padding(.trailing, 4)
-
-                Button(action: onDelete) {
-                    Image(systemName: "trash").foregroundColor(.secondary).font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
+            } header: {
+                Text("Шрифт")
             }
-            .padding(.vertical, 6)
 
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 4) {
-                    if section.snippets.isEmpty {
-                        Text("No snippets yet").font(.caption).foregroundColor(.secondary).padding(.leading, 20)
-                    } else {
-                        ForEach($section.snippets) { $snippet in
-                            SnippetEditor(snippet: $snippet) {
-                                section.snippets.removeAll { $0.id == snippet.id }
-                            }
-                        }
-                        .onMove { from, to in
-                            section.snippets.move(fromOffsets: from, toOffset: to)
-                        }
-                    }
-
-                    // Add new snippet row
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.accentColor)
-                            .font(.system(size: 14))
-                        TextField("Title", text: $newTitle)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 90)
-                        TextField("Content", text: $newContent)
-                            .textFieldStyle(.roundedBorder)
-                        Button("Add") {
-                            let t = newTitle.trimmingCharacters(in: .whitespaces)
-                            let c = newContent.trimmingCharacters(in: .whitespaces)
-                            guard !t.isEmpty, !c.isEmpty else { return }
-                            section.snippets.append(Snippet(title: t, content: c))
-                            newTitle = ""
-                            newContent = ""
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(newTitle.trimmingCharacters(in: .whitespaces).isEmpty ||
-                                  newContent.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    .padding(.leading, 20)
-                    .padding(.top, 4)
-                }
-                .padding(.bottom, 6)
+            Section {
+                Toggle("Показывать только название (без превью содержимого)", isOn: $titleOnly)
+            } header: {
+                Text("Отображение")
             }
         }
+        .formStyle(.grouped)
     }
 }
 
-struct SnippetEditor: View {
-    @Binding var snippet: Snippet
-    var onDelete: () -> Void
+// MARK: - Сниппеты
+
+struct SnippetsTab: View {
+    @ObservedObject var store = SnippetStore.shared
+    @State private var selectedSectionID: UUID?
+    @State private var selectedSnippetID: UUID?
+    @State private var newSectionName = ""
+
+    private var selectedSectionIndex: Int? {
+        store.sections.firstIndex { $0.id == selectedSectionID }
+    }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "line.3.horizontal")
-                .foregroundColor(.secondary)
-                .font(.system(size: 11))
-            TextField("Title", text: $snippet.title)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 90)
-            TextField("Content", text: $snippet.content)
-                .textFieldStyle(.roundedBorder)
-            Button(action: onDelete) {
-                Image(systemName: "minus.circle.fill").foregroundColor(.red)
+        HStack(spacing: 0) {
+            sectionsColumn
+            Divider()
+            if let idx = selectedSectionIndex {
+                SnippetsColumn(
+                    section: $store.sections[idx],
+                    selectedSnippetID: $selectedSnippetID
+                )
+            } else {
+                placeholder("Выберите раздел")
             }
-            .buttonStyle(.plain)
         }
-        .padding(.leading, 20)
     }
+
+    private var sectionsColumn: some View {
+        VStack(spacing: 0) {
+            columnHeader("Разделы")
+
+            List(selection: $selectedSectionID) {
+                ForEach(store.sections) { section in
+                    Text(section.name)
+                        .tag(section.id)
+                        .lineLimit(1)
+                }
+                .onMove { from, to in
+                    store.sections.move(fromOffsets: from, toOffset: to)
+                }
+                .onDelete { store.sections.remove(atOffsets: $0) }
+            }
+            .listStyle(.sidebar)
+
+            Divider()
+
+            HStack(spacing: 6) {
+                TextField("Новый раздел", text: $newSectionName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+                    .onSubmit { addSection() }
+                Button(action: addSection) {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.bordered)
+                .disabled(newSectionName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(8)
+        }
+        .frame(width: 160)
+    }
+
+    private func addSection() {
+        let name = newSectionName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let s = SnippetSection(name: name, snippets: [])
+        store.sections.append(s)
+        selectedSectionID = s.id
+        newSectionName = ""
+    }
+}
+
+struct SnippetsColumn: View {
+    @Binding var section: SnippetSection
+    @Binding var selectedSnippetID: UUID?
+
+    private var selectedSnippetIndex: Int? {
+        section.snippets.firstIndex { $0.id == selectedSnippetID }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            columnHeader(section.name)
+
+            HSplitView {
+                snippetList
+                if let idx = selectedSnippetIndex {
+                    SnippetEditorPanel(snippet: $section.snippets[idx])
+                        .frame(minWidth: 180)
+                } else {
+                    placeholder("Выберите сниппет")
+                        .frame(minWidth: 180)
+                }
+            }
+        }
+    }
+
+    private var snippetList: some View {
+        VStack(spacing: 0) {
+            List(selection: $selectedSnippetID) {
+                ForEach(section.snippets) { snippet in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(snippet.title)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                        Text(snippet.content)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    .tag(snippet.id)
+                    .padding(.vertical, 2)
+                }
+                .onMove { from, to in section.snippets.move(fromOffsets: from, toOffset: to) }
+                .onDelete { section.snippets.remove(atOffsets: $0) }
+            }
+            .listStyle(.bordered)
+
+            Divider()
+
+            HStack(spacing: 4) {
+                Button {
+                    let s = Snippet(title: "Новый сниппет", content: "")
+                    section.snippets.append(s)
+                    selectedSnippetID = s.id
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+
+                Button {
+                    guard let id = selectedSnippetID else { return }
+                    section.snippets.removeAll { $0.id == id }
+                    selectedSnippetID = nil
+                } label: {
+                    Image(systemName: "minus")
+                }
+                .buttonStyle(.borderless)
+                .disabled(selectedSnippetID == nil)
+
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+        }
+        .frame(minWidth: 150)
+    }
+}
+
+struct SnippetEditorPanel: View {
+    @Binding var snippet: Snippet
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Название")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextField("Название сниппета", text: $snippet.title)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Содержимое")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextEditor(text: $snippet.content)
+                    .font(.system(size: 13, design: .monospaced))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
+                    )
+            }
+        }
+        .padding(12)
+    }
+}
+
+// MARK: - Shared helpers
+
+private func columnHeader(_ title: String) -> some View {
+    HStack {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(.secondary)
+        Spacer()
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .background(Color(NSColor.windowBackgroundColor))
+    .overlay(Divider(), alignment: .bottom)
+}
+
+private func placeholder(_ text: String) -> some View {
+    VStack {
+        Spacer()
+        Text(text).foregroundColor(.secondary)
+        Spacer()
+    }
+    .frame(maxWidth: .infinity)
 }
 
 private extension NSEvent.ModifierFlags {

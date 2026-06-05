@@ -35,9 +35,9 @@ struct SnippetsView: View {
         ScrollView {
             VStack(spacing: 2) {
                 if store.sections.isEmpty {
-                    emptyState("No sections.\nAdd them in Settings.")
+                    emptyState("Нет разделов.\nДобавьте их в Настройках.")
                 } else if currentSnippets.isEmpty {
-                    emptyState("No snippets in this section.\nAdd them in Settings.")
+                    emptyState("Нет сниппетов в этом разделе.\nДобавьте их в Настройках.")
                 } else {
                     ForEach(Array(currentSnippets.enumerated()), id: \.element.id) { index, snippet in
                         SnippetRow(
