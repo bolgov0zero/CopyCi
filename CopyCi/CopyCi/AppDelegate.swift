@@ -121,7 +121,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hideSnippetsPanel(restoreApp: false)
         // Restore previous app first, then paste
         previousApp?.activate(options: .activateIgnoringOtherApps)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             PasteManager.paste(content)
         }
     }
