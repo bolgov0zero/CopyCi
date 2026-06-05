@@ -174,7 +174,7 @@ class SnippetsPanel: NSPanel {
 
         super.init(
             contentRect: NSRect(origin: .zero, size: savedSize),
-            styleMask: [.titled, .fullSizeContentView, .resizable],
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -189,11 +189,6 @@ class SnippetsPanel: NSPanel {
         backgroundColor = .clear
         isOpaque = false
         hasShadow = true
-        titleVisibility = .hidden
-        titlebarAppearsTransparent = true
-        standardWindowButton(.closeButton)?.isHidden = true
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
         minSize = NSSize(width: 240, height: 180)
 
         let view = SnippetsView(
