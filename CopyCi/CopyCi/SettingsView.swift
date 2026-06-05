@@ -275,11 +275,9 @@ struct SnippetsTab: View {
         VStack(spacing: 0) {
             colHeader("Разделы")
             List(selection: $selectedSectionID) {
-                ForEach(store.sections) { s in
-                    Label(s.name, systemImage: "folder.fill")
+                ForEach($store.sections) { $s in
+                    SectionRow(section: $s, isSelected: selectedSectionID == s.id)
                         .tag(s.id)
-                        .lineLimit(1)
-                        .font(.system(size: 13))
                 }
                 .onMove { store.sections.move(fromOffsets: $0, toOffset: $1) }
                 .onDelete { idx in
@@ -418,6 +416,46 @@ struct SnippetsTab: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.textBackgroundColor).opacity(0.3))
+    }
+}
+
+struct SectionRow: View {
+    @Binding var section: SnippetSection
+    let isSelected: Bool
+    @State private var editing = false
+    @State private var draft = ""
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "folder.fill")
+                .foregroundColor(.secondary)
+                .font(.system(size: 12))
+            if editing {
+                TextField("", text: $draft, onCommit: commit)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .onExitCommand { editing = false }
+            } else {
+                Text(section.name)
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    .onTapGesture(count: 2) { startEditing() }
+            }
+        }
+        .onChange(of: isSelected) { selected in
+            if !selected && editing { commit() }
+        }
+    }
+
+    private func startEditing() {
+        draft = section.name
+        editing = true
+    }
+
+    private func commit() {
+        let name = draft.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty { section.name = name }
+        editing = false
     }
 }
 
