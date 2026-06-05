@@ -60,8 +60,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 defer: false
             )
             window.title = "Настройки CopyCi"
-            window.backgroundColor = NSColor.windowBackgroundColor
-            window.contentView = NSHostingView(rootView: SettingsView())
+            window.backgroundColor = .clear
+            window.isOpaque = false
+
+            // Liquid glass: NSVisualEffectView as base + SwiftUI on top
+            let effect = NSVisualEffectView(frame: .zero)
+            effect.blendingMode = .behindWindow
+            effect.state = .active
+            effect.material = .underWindowBackground
+            let hosting = NSHostingView(rootView: SettingsView())
+            hosting.translatesAutoresizingMaskIntoConstraints = false
+            effect.addSubview(hosting)
+            NSLayoutConstraint.activate([
+                hosting.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
+                hosting.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
+                hosting.topAnchor.constraint(equalTo: effect.topAnchor),
+                hosting.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
+            ])
+            window.contentView = effect
             window.center()
             window.isReleasedWhenClosed = false
             settingsWindow = window
