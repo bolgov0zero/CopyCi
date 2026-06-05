@@ -12,6 +12,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         setupMenuBar()
         setupHotkey()
+        // Request Accessibility on first launch so CGEvent paste works
+        PasteManager.checkAccessibility()
     }
 
     // MARK: - Menu bar
@@ -118,7 +120,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hideSnippetsPanel(restoreApp: false)
         // Restore previous app first, then paste
         previousApp?.activate(options: .activateIgnoringOtherApps)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             PasteManager.paste(content)
         }
     }
@@ -153,7 +155,7 @@ class SnippetsPanel: NSPanel {
 
         super.init(
             contentRect: NSRect(origin: .zero, size: savedSize),
-            styleMask: [.titled, .fullSizeContentView, .resizable, .nonactivatingPanel],
+            styleMask: [.titled, .fullSizeContentView, .resizable],
             backing: .buffered,
             defer: false
         )
