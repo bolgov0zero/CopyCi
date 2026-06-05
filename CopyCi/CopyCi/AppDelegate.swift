@@ -195,7 +195,11 @@ class SnippetsPanel: NSPanel {
             onPaste: { [weak self] content in self?.onPaste?(content) },
             onClose: { [weak self] in self?.onClose?() }
         )
-        contentView = NSHostingView(rootView: view)
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = CGColor.clear
+        hostingView.layer?.isOpaque = false
+        contentView = hostingView
     }
 
     func showNear(point: NSPoint) {
