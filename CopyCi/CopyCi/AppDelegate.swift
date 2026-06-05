@@ -54,12 +54,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openSettings() {
         if settingsWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 580),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                contentRect: NSRect(x: 0, y: 0, width: 580, height: 500),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
             window.title = "Настройки CopyCi"
+            window.titlebarAppearsTransparent = true
+            window.backgroundColor = .clear
+            window.isOpaque = false
             window.contentView = NSHostingView(rootView: SettingsView())
             window.center()
             window.isReleasedWhenClosed = false
